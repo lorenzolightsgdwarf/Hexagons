@@ -2,35 +2,33 @@ import QtQuick 2.6
 import QtQuick.Window 2.2
 import QtMultimedia 5.6
 import QtQuick.Controls 1.4
-import FilterFactory 1.0
+import ARToolkit 1.0
 import ImageAnayser 1.0
 Window {
     visible: true
     id : root
     width : 640
-    height : 360
+    height : 480
 
 
     MainForm {
-        width: 640
-        height: 360
+       anchors.fill: parent
 
         MouseArea {
             id: selector
             anchors.fill: parent
-            property int clicked_id
+            property string clicked_id
             onClicked: {
                 var minDist = 1000
-                var max = filter.corners.length
+                var max = filter.detectedMarkers.length
                 if(max > 0){
                     for(var i = 0; i < max; i++){//if we can assume a minimum distance then replace i++ with i+=4
-
-                        var dx = mouseX - (filter.corners[i].x * 640 / 1280)
-                        var dy = mouseY - (filter.corners[i].y * 360 / 720)
+                        var dx = mouseX - (filter.detectedMarkers[i]["TLCorner"].x)
+                        var dy = mouseY - (filter.detectedMarkers[i]["TLCorner"].y)
                         var newMin = Math.sqrt((dx*dx)+(dy*dy))
                         if(newMin < minDist){
                             minDist = newMin
-                            clicked_id = filter.corners[i].z
+                            clicked_id = filter.detectedMarkers[i]["id"]
                         }
                     }
                     console.log("clicked is: ", clicked_id)
@@ -43,13 +41,12 @@ Window {
         Camera {
             id: camera
 
-            //deviceId: QtMultimedia.availableCameras[1].deviceId
-
+            deviceId: QtMultimedia.availableCameras[1].deviceId
+            viewfinder.resolution: "640x480"
             imageCapture {
                 onImageCaptured: {
                     photoPreview.source = preview
-
-                    analyser.run(captureButton.filename, selector.clicked_id)
+                    analyser.run(filter.detectedMarkers, selector.clicked_id)
                 }
             }
         }
@@ -61,14 +58,17 @@ Window {
             filters: [filter]
 
         }
-        FilterFactory{
+        ARToolkit{
             id:filter
-            onCornersChanged: {if(corners.length>0)canvas.requestPaint()}
+            onDetectedMarkersChanged: {
+                if(detectedMarkers.length>0){
+                    canvas.requestPaint()
+                }
+            }
         }
 
         ImageAnayser{
             id: analyser
-
         }
 
         Canvas {
@@ -84,11 +84,10 @@ Window {
                     ctx.reset();
 
                     ctx.fillStyle = "#ff0000";
-                    var max = filter.corners.length
+                    var max = filter.detectedMarkers.length
                     for (var i = 0; i< max; ++i){
-
-                        var centreX = ((filter.corners[i].x*640) / 1280) - 3;
-                        var centreY = ((filter.corners[i].y*360) / 720) - 3;
+                        var centreX = filter.detectedMarkers[i]["TLCorner"].x-3;
+                        var centreY = filter.detectedMarkers[i]["TLCorner"].y-3;
                         ctx.fillRect(centreX, centreY, 6, 6)
                     }
                 }
@@ -102,21 +101,15 @@ Window {
         Button{
             id : captureButton
             text : "Capture Frame"
-            property string filename: "/home/leo/build-Hexagons-Desktop_Qt_5_6_0_GCC_64bit-Debug/save.jpg"
+            property string filename: "save.jpg"
 
             x : 320 - width/2
-            y : 360 - height
+            y : 480 - height
 
             onClicked: {
                 camera.imageCapture.captureToLocation(filename)
             }
         }
-//        Button{
-//            id: resumeButton
-//            text : "Resume"
-
-//            onClicked: //how do I resume?;
-//        }
     }
 
 }
