@@ -1,9 +1,9 @@
 #include "imageanayser.h"
 #include <QVector2D>
+#include <QVector4D>
 #include <QImage>
-#include <stdio.h>
-
-
+#include <QFile>
+#include <QTextStream>
 ImageAnayser::ImageAnayser(QObject *parent):
     QObject(parent)
 {
@@ -16,6 +16,8 @@ void ImageAnayser::run(QVariantList markers, QString origin)
     if(0!=reconstruct_board(markers, MARKER_LEN, MARKER_DIST, MARKER_ELEV, origin)){
         qDebug() << "something went wrong in the image conversion";
     }
+
+
 
 }
 
@@ -40,7 +42,7 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
     QVector3D translation;
     QQuaternion rot;
 
-    int indexOfOrigin = getBottomLeftMarker(_markers, origin);
+    int indexOfOrigin = getOriginMarkerID(_markers, origin);
     if(indexOfOrigin<0){
         qDebug()<<"Can't find origin id:"<<origin;
         return-2;
@@ -61,6 +63,8 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
 
     QMatrix4x4 originInv = originM.inverted();
 
+    QList<QVector4D> final_positions;
+    QList<double> orientations;
     for(int i = 0; i < _markers.size(); i++){
 
         QVariantMap marker=_markers.at(i);
@@ -107,6 +111,15 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
         qDebug() << "Bottom Right" << new_squad.at(4);
         qDebug() << "Distance to Origin" << new_squad.at(0).length();
         qDebug() << "Orientation" << orientation*180/PI;
+
+        if(new_squad.size()>1){
+            final_positions.append(QVector4D(new_squad.at(0).x(),new_squad.at(0).y(),new_squad.at(0).z(),id.remove(0,4).toInt()));
+            orientations.append(orientation);
+        }
+    }
+
+    if(!write_output_file(final_positions,orientations)){
+        return -3;
     }
 
 
@@ -115,9 +128,39 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
 }
 
 
+bool ImageAnayser::write_output_file(QList<QVector4D> markers,QList<double> orientations){
+      QFile output_file("board_configuration.data");
+      if(!output_file.open(QFile::WriteOnly| QFile::Text)){
+          qDebug()<<"Error in opening output file";
+          return false;
+      }
+      QTextStream output_stream(&output_file);
+      output_stream<<markers.size()<<"\n";
+      QMatrix4x4 rotX(1,0,0,0,
+                      0,cos(0.143117),-sin(0.143117),0,
+                      0,sin(0.143117),cos(0.143117),0,
+                      0,0,0,1);
+      for(int i=0;i<markers.size();i++){
+          QVector4D marker=markers.at(i);
+          output_stream<<"\n"<<marker.w()<<"\n";
+          output_stream<<MARKER_LEN<<"\n"<<"\n";
+          double angleZ=orientations.at(i);
+          QMatrix4x4 rotZ(cos(angleZ),-sin(angleZ),0,0,
+                          sin(angleZ),cos(angleZ),0,0,
+                          0,0,1,0,
+                          0,0,0,1);
+          QMatrix4x4 compRot=rotX*rotZ;
+          output_stream<<compRot(0,0)<<" "<<compRot(0,1)<<" "<<compRot(0,2)<<" "<<marker.x()<<"\n";
+          output_stream<<compRot(1,0)<<" "<<compRot(1,1)<<" "<<compRot(1,2)<<" "<<marker.y()<<"\n";
+          output_stream<<compRot(2,0)<<" "<<compRot(2,1)<<" "<<compRot(2,2)<<" "<<marker.z()<<"\n";
+      }
+      output_stream.flush();
+      output_file.close();
+      return true;
+}
 
 
-int ImageAnayser::getBottomLeftMarker(QList<QVariantMap> markers, QString origin){
+int ImageAnayser::getOriginMarkerID(QList<QVariantMap> markers, QString origin){
     for(int i=0;i<markers.size();i++){
         QVariantMap v=markers.at(i);
         if(v["id"].toString()==origin)
@@ -129,7 +172,7 @@ int ImageAnayser::getBottomLeftMarker(QList<QVariantMap> markers, QString origin
 
 QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float marker_distance, float marker_size, float marker_elevation, double &orientation){
 
-    double y_chunk = ((double) marker_distance) * cos(PI/3.0);
+    double y_chunk = ((double) marker_distance) * sin(PI/6.0);
 
     double y_mod = fmod(((double) exact[0].y()), y_chunk);
     if(y_mod < 0.0){
@@ -140,7 +183,7 @@ QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float 
     double to_add = 0;
     if(y_mod > y_chunk/2.0) to_add = y_chunk;
 
-    double y_new = ( exact[0][1]) - (y_mod) + (to_add);
+    double y_new = ( exact[0].y()) - (y_mod) + (to_add);
 
     double x_chunk = ((double)marker_distance) * cos(PI/6.0);
     double x_dist = exact[0].x();

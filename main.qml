@@ -60,6 +60,7 @@ Window {
         }
         ARToolkit{
             id:filter
+            matrixCode: ARToolkit.MATRIX_CODE_4x4_BCH_13_9_3
             onDetectedMarkersChanged: {
                 if(detectedMarkers.length>0){
                     canvas.requestPaint()

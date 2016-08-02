@@ -1,6 +1,5 @@
 #ifndef IMAGEANAYSER_H
 #define IMAGEANAYSER_H
-#include <iostream>
 #include <math.h>
 #include <QMatrix4x4>
 #include <QObject>
@@ -19,23 +18,28 @@
 #define MARKER_ELEV 0.f
 
 
-using namespace std;
+/*GUI Works only for 640x480
+* Doesn't check for the validity of the composition of the tiles.
+*/
 
 class ImageAnayser: public QObject
 {
     Q_OBJECT
-public:
-    explicit ImageAnayser(QObject* parent =0);
-
-
-    Q_INVOKABLE void run(QVariantList markers, QString origin);
+private:
+    bool write_output_file(QList<QVector4D> markers,QList<double> orientations);
     int reconstruct_board(QVariantList markers, float marker_size, float marker_distance, float marker_elevation, QString origin);
 
-    int getBottomLeftMarker(QList<QVariantMap> markers, QString origin);
+    int getOriginMarkerID(QList<QVariantMap> markers, QString origin);
 
     QVector<QVector3D> approximations(QVector<QVector3D> exact, float marker_distance, float marker_size, float marker_elevation, double &orientation);
 
     double orientationOfMarker (QVector3D center, QVector3D topRight, QVector3D topLeft, float marker_size);
+
+public:
+    explicit ImageAnayser(QObject* parent =0);
+
+    Q_INVOKABLE void run(QVariantList markers, QString origin);
+
 
 };
 
