@@ -38,7 +38,7 @@ private:
 public:
     explicit ImageAnayser(QObject* parent =0);
 
-    Q_INVOKABLE void run(QVariantList markers, QString origin);
+    Q_INVOKABLE bool run(QVariantList markers, QString origin);
 
 
 };

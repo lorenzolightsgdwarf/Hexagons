@@ -10,14 +10,15 @@ ImageAnayser::ImageAnayser(QObject *parent):
 
 }
 
-void ImageAnayser::run(QVariantList markers, QString origin)
+bool ImageAnayser::run(QVariantList markers, QString origin)
 {
 
     if(0!=reconstruct_board(markers, MARKER_LEN, MARKER_DIST, MARKER_ELEV, origin)){
         qDebug() << "something went wrong in the image conversion";
+        return false;
     }
 
-
+    return true;
 
 }
 
@@ -129,7 +130,12 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
 
 
 bool ImageAnayser::write_output_file(QList<QVector4D> markers,QList<double> orientations){
-      QFile output_file("board_configuration.data");
+#ifdef ANDROID
+    QString extstr=QString(getenv("EXTERNAL_STORAGE"))+"/staTIc/";
+    QFile output_file(extstr+"board_configuration.data");
+#else
+    QFile output_file("board_configuration.data");
+#endif
       if(!output_file.open(QFile::WriteOnly| QFile::Text)){
           qDebug()<<"Error in opening output file";
           return false;

@@ -10,6 +10,10 @@ Window {
     width : 640
     height : 480
 
+    property real scaleX:video_output.contentRect.width/filter.cameraResolution.width
+    property real scaleY:video_output.contentRect.height/filter.cameraResolution.height
+
+    property int run_done:-1;
 
     MainForm {
        anchors.fill: parent
@@ -23,8 +27,8 @@ Window {
                 var max = filter.detectedMarkers.length
                 if(max > 0){
                     for(var i = 0; i < max; i++){//if we can assume a minimum distance then replace i++ with i+=4
-                        var dx = mouseX - (filter.detectedMarkers[i]["TLCorner"].x)
-                        var dy = mouseY - (filter.detectedMarkers[i]["TLCorner"].y)
+                        var dx = mouseX - ( video_output.contentRect.x+scaleX*filter.detectedMarkers[i]["TLCorner"].x)
+                        var dy = mouseY - ( video_output.contentRect.y+scaleY*filter.detectedMarkers[i]["TLCorner"].y)
                         var newMin = Math.sqrt((dx*dx)+(dy*dy))
                         if(newMin < minDist){
                             minDist = newMin
@@ -40,20 +44,28 @@ Window {
 
         Camera {
             id: camera
-
-            deviceId: QtMultimedia.availableCameras[1].deviceId
+            deviceId: QtMultimedia.availableCameras[0].deviceId
+            imageProcessing.whiteBalanceMode: CameraImageProcessing.WhiteBalanceAuto
+            focus.focusMode: CameraFocus.FocusContinuous
+            captureMode: Camera.CaptureViewfinder
+            exposure.exposureMode: CameraExposure.ExposureModeVendor
+            exposure.meteringMode: CameraExposure.MeteringMatrix
+            imageProcessing.colorFilter: CameraImageProcessing.ColorFilterVendor
+            imageProcessing.denoisingLevel: 1
+            imageProcessing.sharpeningLevel: 1
             viewfinder.resolution: "640x480"
             imageCapture {
                 onImageCaptured: {
-                    photoPreview.source = preview
-                    analyser.run(filter.detectedMarkers, selector.clicked_id)
+                    run_done=analyser.run(filter.detectedMarkers, selector.clicked_id)
                 }
             }
         }
 
         VideoOutput {
+            id:video_output
             source: camera
             anchors.fill: parent
+            fillMode: VideoOutput.PreserveAspectCrop
             focus : visible // to receive focus and capture key events when visible
             filters: [filter]
 
@@ -81,34 +93,42 @@ Window {
 
                 onPaint: {
                     var ctx = canvas.getContext('2d')
-
                     ctx.reset();
-
-                    ctx.fillStyle = "#ff0000";
                     var max = filter.detectedMarkers.length
                     for (var i = 0; i< max; ++i){
-                        var centreX = filter.detectedMarkers[i]["TLCorner"].x-3;
-                        var centreY = filter.detectedMarkers[i]["TLCorner"].y-3;
-                        ctx.fillRect(centreX, centreY, 6, 6)
+                        if(selector.clicked_id == filter.detectedMarkers[i]["id"])
+                            ctx.fillStyle = "#ff0000";
+                        else
+                            ctx.fillStyle = "#00ff00";
+
+                        var centreX = video_output.contentRect.x+scaleX*filter.detectedMarkers[i]["TLCorner"].x-3;
+                        var centreY = video_output.contentRect.y+scaleY*filter.detectedMarkers[i]["TLCorner"].y-3;
+                        ctx.fillRect(centreX, centreY, 10, 10)
                     }
                 }
         }
 
-        Image {
-            id: photoPreview
-            anchors.fill: parent
-        }
 
         Button{
             id : captureButton
             text : "Capture Frame"
             property string filename: "save.jpg"
-
-            x : 320 - width/2
-            y : 480 - height
-
+            anchors.bottom: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
             onClicked: {
                 camera.imageCapture.captureToLocation(filename)
+            }
+            Rectangle{
+                width: 50
+                height: 50
+                radius: 25
+                anchors.left: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                color: if(run_done<0)
+                           return "yellow"
+                       else if(run_done==0)
+                           return "red"
+                       else return "green"
             }
         }
     }
