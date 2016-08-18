@@ -155,7 +155,7 @@ bool ImageAnayser::write_output_file(QList<QVector4D> markers,QList<double> orie
                           sin(angleZ),cos(angleZ),0,0,
                           0,0,1,0,
                           0,0,0,1);
-          QMatrix4x4 compRot=rotX*rotZ;
+          QMatrix4x4 compRot=rotZ*rotX;
           output_stream<<compRot(0,0)<<" "<<compRot(0,1)<<" "<<compRot(0,2)<<" "<<marker.x()<<"\n";
           output_stream<<compRot(1,0)<<" "<<compRot(1,1)<<" "<<compRot(1,2)<<" "<<marker.y()<<"\n";
           output_stream<<compRot(2,0)<<" "<<compRot(2,1)<<" "<<compRot(2,2)<<" "<<marker.z()<<"\n";
@@ -178,32 +178,40 @@ int ImageAnayser::getOriginMarkerID(QList<QVariantMap> markers, QString origin){
 
 QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float marker_distance, float marker_size, float marker_elevation, double &orientation){
 
-    double y_chunk = ((double) marker_distance) * sin(PI/6.0);
+    double y_chunk = ((double) marker_distance) * sin(PI/6.0);//Pay attention to the tile orientation!!!
 
     double y_mod = fmod(((double) exact[0].y()), y_chunk);
-    if(y_mod < 0.0){
-        y_mod += y_chunk;
-    }
-
+//    if(y_mod < 0.0){
+//        y_mod += y_chunk;
+//    }
 
     double to_add = 0;
-    if(y_mod > y_chunk/2.0) to_add = y_chunk;
+
+    if(fabs(y_mod) > y_chunk/3.0){
+        if(y_mod>0)
+            to_add = y_chunk;
+        else
+            to_add = -y_chunk;
+    }
 
     double y_new = ( exact[0].y()) - (y_mod) + (to_add);
+
 
     double x_chunk = ((double)marker_distance) * cos(PI/6.0);
     double x_dist = exact[0].x();
     double x_mod = fmod(( x_dist), (x_chunk));
-    if(x_mod < 0){
-        x_mod += x_chunk;
-    }
+//    if(x_mod < 0){
+//        x_mod += x_chunk;
+//    }
 
-    if(x_mod > ( x_chunk/2.0)){
-        to_add = x_chunk;
-    } else {
-        to_add = 0.0;
-    }
+    to_add=0.0;
 
+    if(fabs(x_mod) > ( x_chunk/3.0)){
+        if(x_mod>0)
+            to_add = x_chunk;
+        else
+            to_add = -x_chunk;
+    }
     double x_new = x_dist - ( x_mod) + (to_add);
 
 

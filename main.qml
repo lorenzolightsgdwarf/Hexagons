@@ -73,6 +73,11 @@ Window {
         ARToolkit{
             id:filter
             matrixCode: ARToolkit.MATRIX_CODE_4x4_BCH_13_9_3
+            projectionMatrix:Qt.matrix4x4(
+                        1.4272479930179818e+03 ,0 ,6.4750000000000000e+02,0,
+                        0, 1.4272479930179818e+03 , 4.8550000000000000e+02,0,
+                        0,0,1,0,
+                        0,0,0,1)
             onDetectedMarkersChanged: {
                 if(detectedMarkers.length>0){
                     canvas.requestPaint()
@@ -95,6 +100,7 @@ Window {
                     var ctx = canvas.getContext('2d')
                     ctx.reset();
                     var max = filter.detectedMarkers.length
+                    ctx.font="20pt sans-serif"
                     for (var i = 0; i< max; ++i){
                         if(selector.clicked_id == filter.detectedMarkers[i]["id"])
                             ctx.fillStyle = "#ff0000";
@@ -103,7 +109,8 @@ Window {
 
                         var centreX = video_output.contentRect.x+scaleX*filter.detectedMarkers[i]["TLCorner"].x-3;
                         var centreY = video_output.contentRect.y+scaleY*filter.detectedMarkers[i]["TLCorner"].y-3;
-                        ctx.fillRect(centreX, centreY, 10, 10)
+                        //ctx.fillRect(centreX, centreY, 10, 10)
+                        ctx.fillText(filter.detectedMarkers[i]["id"],centreX,centreY);
                     }
                 }
         }
