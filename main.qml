@@ -27,8 +27,8 @@ Window {
                 var max = filter.detectedMarkers.length
                 if(max > 0){
                     for(var i = 0; i < max; i++){//if we can assume a minimum distance then replace i++ with i+=4
-                        var dx = mouseX - ( video_output.contentRect.x+scaleX*filter.detectedMarkers[i]["TLCorner"].x)
-                        var dy = mouseY - ( video_output.contentRect.y+scaleY*filter.detectedMarkers[i]["TLCorner"].y)
+                        var dx = mouseX - ( video_output.contentRect.x+0.5*scaleX*(filter.detectedMarkers[i]["TLCorner"].x+filter.detectedMarkers[i]["BRCorner"].x))
+                        var dy = mouseY - ( video_output.contentRect.y+0.5*scaleY*(filter.detectedMarkers[i]["TLCorner"].y+filter.detectedMarkers[i]["BRCorner"].y))
                         var newMin = Math.sqrt((dx*dx)+(dy*dy))
                         if(newMin < minDist){
                             minDist = newMin
@@ -101,16 +101,32 @@ Window {
                     ctx.reset();
                     var max = filter.detectedMarkers.length
                     ctx.font="20pt sans-serif"
+                    ctx.textBaseline="top"
+                    var text_width=ctx.measureText("(0000.00,0000.00,000)").width;
                     for (var i = 0; i< max; ++i){
+                        ctx.fillStyle = "#000000";
+                        var centreX = video_output.contentRect.x+0.5*scaleX*(filter.detectedMarkers[i]["TLCorner"].x+filter.detectedMarkers[i]["BRCorner"].x);
+                        var centreY = video_output.contentRect.y+0.5*scaleY*(filter.detectedMarkers[i]["TLCorner"].y+filter.detectedMarkers[i]["BRCorner"].y);
+
+                        ctx.fillRect(centreX-5,
+                                     centreY-5,
+                                     text_width,100);
+
                         if(selector.clicked_id == filter.detectedMarkers[i]["id"])
                             ctx.fillStyle = "#ff0000";
                         else
                             ctx.fillStyle = "#00ff00";
 
-                        var centreX = video_output.contentRect.x+scaleX*filter.detectedMarkers[i]["TLCorner"].x-3;
-                        var centreY = video_output.contentRect.y+scaleY*filter.detectedMarkers[i]["TLCorner"].y-3;
-                        //ctx.fillRect(centreX, centreY, 10, 10)
-                        ctx.fillText(filter.detectedMarkers[i]["id"],centreX,centreY);
+
+                        var tag_id=filter.detectedMarkers[i]["id"];
+                        var text=filter.detectedMarkers[i]["id"];
+                        ctx.fillText(text,centreX,centreY);
+                        if(analyser.poses[tag_id]){
+                            text="("+Math.round(analyser.poses[tag_id].x*100)/100+","+Math.round(analyser.poses[tag_id].y*100)/100+","+Math.round(analyser.poses[tag_id].z*180/Math.PI)+")";
+                            ctx.fillText(text,centreX,centreY+40);
+                        }
+
+
                     }
                 }
         }

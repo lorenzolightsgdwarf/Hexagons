@@ -25,6 +25,7 @@
 class ImageAnayser: public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QVariantMap poses READ poses NOTIFY posesChanged)
 private:
     bool write_output_file(QList<QVector4D> markers,QList<double> orientations);
     int reconstruct_board(QVariantList markers, float marker_size, float marker_distance, float marker_elevation, QString origin);
@@ -35,10 +36,16 @@ private:
 
     double orientationOfMarker (QVector3D center, QVector3D topRight, QVector3D topLeft, float marker_size);
 
+    QVariantMap m_poses;
+
+signals:
+    void posesChanged();
 public:
     explicit ImageAnayser(QObject* parent =0);
 
+    QVariantMap poses(){return m_poses;}
     Q_INVOKABLE bool run(QVariantList markers, QString origin);
+
 
 
 };

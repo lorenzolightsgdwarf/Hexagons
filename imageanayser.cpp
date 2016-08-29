@@ -26,6 +26,7 @@ bool ImageAnayser::run(QVariantList markers, QString origin)
 
 int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, float marker_distance, float marker_elevation, QString origin){
 
+    m_poses.clear();
     QList<QVariantMap> _markers;
     Q_FOREACH(QVariant v,markers){
         _markers.append(v.value<QVariantMap>());
@@ -114,10 +115,14 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
         qDebug() << "Orientation" << orientation*180/PI;
 
         if(new_squad.size()>1){
+            m_poses[id]=QVector3D(round(new_squad.at(0).x()*100)/100,round(new_squad.at(0).y()*100)/100,orientation);
+            qDebug()<<m_poses[id];
             final_positions.append(QVector4D(new_squad.at(0).x(),new_squad.at(0).y(),new_squad.at(0).z(),id.remove(0,4).toInt()));
             orientations.append(orientation);
         }
     }
+
+    emit posesChanged();
 
     if(!write_output_file(final_positions,orientations)){
         return -3;
