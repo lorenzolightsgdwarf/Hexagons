@@ -125,8 +125,6 @@ Window {
                             text="("+Math.round(analyser.poses[tag_id].x*100)/100+","+Math.round(analyser.poses[tag_id].y*100)/100+","+Math.round(analyser.poses[tag_id].z*180/Math.PI)+")";
                             ctx.fillText(text,centreX,centreY+40);
                         }
-
-
                     }
                 }
         }

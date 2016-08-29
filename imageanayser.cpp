@@ -1,5 +1,4 @@
 #include "imageanayser.h"
-#include <QVector2D>
 #include <QVector4D>
 #include <QImage>
 #include <QFile>
@@ -7,7 +6,7 @@
 ImageAnayser::ImageAnayser(QObject *parent):
     QObject(parent)
 {
-
+    generate_valid_positions();
 }
 
 bool ImageAnayser::run(QVariantList markers, QString origin)
@@ -49,7 +48,6 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
         qDebug()<<"Can't find origin id:"<<origin;
         return-2;
     }
-
 
 
     //calculate the transformation matrix of the origin tag
@@ -105,18 +103,17 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
         double orientation;
         new_squad = approximations(squad, marker_distance, marker_size, marker_elevation, orientation);
 
-        qDebug() << "Marker:"<<id;
-        qDebug() <<"Center" << new_squad.at(0);
-        qDebug() << "Top Rigth" <<new_squad.at(1);
-        qDebug() << "Top Left" << new_squad.at(2);
-        qDebug() << "Bottom Left" << new_squad.at(3);
-        qDebug() << "Bottom Right" << new_squad.at(4);
-        qDebug() << "Distance to Origin" << new_squad.at(0).length();
-        qDebug() << "Orientation" << orientation*180/PI;
-
         if(new_squad.size()>1){
-            m_poses[id]=QVector3D(round(new_squad.at(0).x()*100)/100,round(new_squad.at(0).y()*100)/100,orientation);
-            qDebug()<<m_poses[id];
+            qDebug() << "Marker:"<<id;
+            qDebug() <<"Center" << new_squad.at(0);
+            qDebug() << "Top Rigth" <<new_squad.at(1);
+            qDebug() << "Top Left" << new_squad.at(2);
+            qDebug() << "Bottom Left" << new_squad.at(3);
+            qDebug() << "Bottom Right" << new_squad.at(4);
+            qDebug() << "Distance to Origin" << new_squad.at(0).length();
+            qDebug() << "Orientation" << orientation*180/PI;
+
+            m_poses[id]=QVector3D(new_squad.at(0).x(),new_squad.at(0).y(),orientation);
             final_positions.append(QVector4D(new_squad.at(0).x(),new_squad.at(0).y(),new_squad.at(0).z(),id.remove(0,4).toInt()));
             orientations.append(orientation);
         }
@@ -183,14 +180,19 @@ int ImageAnayser::getOriginMarkerID(QList<QVariantMap> markers, QString origin){
 
 QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float marker_distance, float marker_size, float marker_elevation, double &orientation){
 
+
+    bool uncertainty_on_x=false;
+    bool uncertainty_on_y=false;
+
+
     double y_chunk = ((double) marker_distance) * sin(PI/6.0);//Pay attention to the tile orientation!!!
 
     double y_mod = fmod(((double) exact[0].y()), y_chunk);
-//    if(y_mod < 0.0){
-//        y_mod += y_chunk;
-//    }
 
     double to_add = 0;
+
+    if(fabs(y_mod) > y_chunk/3.0 && fabs(y_mod) < 2*y_chunk/3.0 )
+           uncertainty_on_y=true;
 
     if(fabs(y_mod) > y_chunk/3.0){
         if(y_mod>0)
@@ -199,7 +201,7 @@ QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float 
             to_add = -y_chunk;
     }
 
-    double y_new = ( exact[0].y()) - (y_mod) + (to_add);
+    float y_new = ( exact[0].y()) - (y_mod) + (to_add);
 
 
     double x_chunk = ((double)marker_distance) * cos(PI/6.0);
@@ -211,14 +213,58 @@ QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float 
 
     to_add=0.0;
 
+    if(fabs(x_mod) > ( x_chunk/3.0) && fabs(x_mod) < ( 2*x_chunk/3.0))
+           uncertainty_on_x=true;
+
     if(fabs(x_mod) > ( x_chunk/3.0)){
         if(x_mod>0)
             to_add = x_chunk;
         else
             to_add = -x_chunk;
     }
-    double x_new = x_dist - ( x_mod) + (to_add);
+    float x_new = x_dist - ( x_mod) + (to_add);
 
+
+    if(uncertainty_on_x && uncertainty_on_y){
+        QVector2D best_alternative(DBL_MAX,DBL_MAX);
+        Q_FOREACH(QVector2D valid_position,m_valid_positions){
+            if(exact[0].toVector2D().distanceToPoint(valid_position)< exact[0].toVector2D().distanceToPoint(best_alternative))
+                best_alternative=exact[0].toVector2D();
+        }
+        x_new=best_alternative.x();
+        y_new=best_alternative.y();
+    }
+    else if(uncertainty_on_x){
+        qreal best_x= DBL_MAX;
+        Q_FOREACH(QVector2D valid_position,m_valid_positions){
+            if(qFuzzyCompare(valid_position.y(),y_new)){
+                 if(fabs(exact[0].x()-valid_position.x()) < fabs(exact[0].x()-best_x))
+                     best_x=valid_position.x();
+            }
+        }
+        x_new=best_x;
+    }
+    else if(uncertainty_on_y){
+        qreal best_y= DBL_MAX;
+        Q_FOREACH(QVector2D valid_position,m_valid_positions){
+            if(qFuzzyCompare(valid_position.x(),x_new)){
+                 if(fabs(exact[0].y()-valid_position.y()) < fabs(exact[0].y()-best_y))
+                     best_y=valid_position.y();
+            }
+        }
+        y_new=best_y;
+    }
+    else{
+        bool is_valid=false;
+        Q_FOREACH(QVector2D valid_position,m_valid_positions)
+            if(qFuzzyCompare(valid_position,QVector2D(x_new,y_new))){
+                is_valid=true;
+                break;
+            }
+        if(!is_valid)
+            return QVector<QVector3D>();
+
+    }
 
     QVector3D new_center(x_new, y_new, 0.0);
 
@@ -288,4 +334,44 @@ double ImageAnayser::orientationOfMarker (QVector3D center, QVector3D topRight, 
     }
 
 
+}
+
+void ImageAnayser::generate_valid_positions()
+{
+    float max_circle=500;
+    QList<QVector2D> directions;
+    directions<<QVector2D(cos(M_PI/6)*MARKER_DIST,sin(M_PI/6)*MARKER_DIST)<<QVector2D(0,MARKER_DIST)
+              <<QVector2D(-cos(M_PI/6)*MARKER_DIST,sin(M_PI/6)*MARKER_DIST)<<QVector2D(-cos(M_PI/6)*MARKER_DIST,-sin(M_PI/6)*MARKER_DIST)
+              <<QVector2D(0,-MARKER_DIST)<<QVector2D(cos(M_PI/6)*MARKER_DIST,-sin(M_PI/6)*MARKER_DIST);
+
+    QList<QVector2D> to_visit;
+
+    to_visit<<QVector2D(0,0);
+
+    QVector2D current;
+
+    while(!to_visit.isEmpty()){
+          current=to_visit.first();
+          to_visit.pop_front();
+
+          if(current.length()>max_circle)
+              continue;
+
+          bool skip=false;
+
+          Q_FOREACH(QVector2D prev_center, m_valid_positions )
+              if(prev_center.distanceToPoint(current)<1){
+                  skip=true;
+                  break;
+              }
+
+          if(skip)
+              continue;
+
+          m_valid_positions.append(current);
+
+          Q_FOREACH(QVector2D dir, directions)
+              to_visit.append(current+dir);
+
+    }
 }

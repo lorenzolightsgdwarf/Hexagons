@@ -4,6 +4,7 @@
 #include <QMatrix4x4>
 #include <QObject>
 #include <QImage>
+#include <QVector2D>
 
 #define PI 3.14159265
 #define WIDTH 3600 // was 640
@@ -19,7 +20,6 @@
 
 
 /*GUI Works only for 640x480
-* Doesn't check for the validity of the composition of the tiles.
 */
 
 class ImageAnayser: public QObject
@@ -36,7 +36,10 @@ private:
 
     double orientationOfMarker (QVector3D center, QVector3D topRight, QVector3D topLeft, float marker_size);
 
+    void generate_valid_positions();
+
     QVariantMap m_poses;
+    QList<QVector2D> m_valid_positions;
 
 signals:
     void posesChanged();
