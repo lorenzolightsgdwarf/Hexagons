@@ -3,6 +3,8 @@
 #include <QImage>
 #include <QFile>
 #include <QTextStream>
+
+#include <float.h>
 ImageAnayser::ImageAnayser(QObject *parent):
     QObject(parent)
 {
@@ -63,8 +65,6 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
 
     QMatrix4x4 originInv = originM.inverted();
 
-    QList<QVector4D> final_positions;
-    QList<double> orientations;
     for(int i = 0; i < _markers.size(); i++){
 
         QVariantMap marker=_markers.at(i);
@@ -113,25 +113,21 @@ int ImageAnayser::reconstruct_board(QVariantList markers, float marker_size, flo
             qDebug() << "Distance to Origin" << new_squad.at(0).length();
             qDebug() << "Orientation" << orientation*180/PI;
 
-            m_poses[id]=QVector3D(new_squad.at(0).x(),new_squad.at(0).y(),orientation);
-            final_positions.append(QVector4D(new_squad.at(0).x(),new_squad.at(0).y(),new_squad.at(0).z(),id.remove(0,4).toInt()));
-            orientations.append(orientation);
+            m_poses[id]=QVector4D(new_squad.at(0).x(),new_squad.at(0).y(),new_squad.at(0).z(),orientation);
         }
     }
 
     emit posesChanged();
-
-    if(!write_output_file(final_positions,orientations)){
-        return -3;
-    }
-
 
     return 0;
 
 }
 
 
-bool ImageAnayser::write_output_file(QList<QVector4D> markers,QList<double> orientations){
+bool ImageAnayser::write_output_file(){
+
+    if(m_poses.size()==0) return false;
+
 #ifdef ANDROID
     QString extstr=QString(getenv("EXTERNAL_STORAGE"))+"/staTIc/";
     QFile output_file(extstr+"board_configuration.data");
@@ -143,28 +139,41 @@ bool ImageAnayser::write_output_file(QList<QVector4D> markers,QList<double> orie
           return false;
       }
       QTextStream output_stream(&output_file);
-      output_stream<<markers.size()<<"\n";
+      output_stream<<m_poses.size()<<"\n";
       QMatrix4x4 rotX(1,0,0,0,
                       0,cos(0.143117),-sin(0.143117),0,
                       0,sin(0.143117),cos(0.143117),0,
                       0,0,0,1);
-      for(int i=0;i<markers.size();i++){
-          QVector4D marker=markers.at(i);
-          output_stream<<"\n"<<marker.w()<<"\n";
+      Q_FOREACH(QString marker_id,m_poses.keys()){
+          QString marker_number=marker_id;
+          output_stream<<"\n"<<marker_number.remove(0,4).toInt()<<"\n";
           output_stream<<MARKER_LEN<<"\n"<<"\n";
-          double angleZ=orientations.at(i);
+
+          QVector4D pose=m_poses[marker_id].value<QVector4D>();
+          double angleZ=pose.w();
           QMatrix4x4 rotZ(cos(angleZ),-sin(angleZ),0,0,
                           sin(angleZ),cos(angleZ),0,0,
                           0,0,1,0,
                           0,0,0,1);
           QMatrix4x4 compRot=rotZ*rotX;
-          output_stream<<compRot(0,0)<<" "<<compRot(0,1)<<" "<<compRot(0,2)<<" "<<marker.x()<<"\n";
-          output_stream<<compRot(1,0)<<" "<<compRot(1,1)<<" "<<compRot(1,2)<<" "<<marker.y()<<"\n";
-          output_stream<<compRot(2,0)<<" "<<compRot(2,1)<<" "<<compRot(2,2)<<" "<<marker.z()<<"\n";
+          output_stream<<compRot(0,0)<<" "<<compRot(0,1)<<" "<<compRot(0,2)<<" "<<pose.x()<<"\n";
+          output_stream<<compRot(1,0)<<" "<<compRot(1,1)<<" "<<compRot(1,2)<<" "<<pose.y()<<"\n";
+          output_stream<<compRot(2,0)<<" "<<compRot(2,1)<<" "<<compRot(2,2)<<" "<<pose.z()<<"\n";
       }
       output_stream.flush();
       output_file.close();
       return true;
+}
+
+void ImageAnayser::change_pose(QString id, qreal x, qreal y, qreal orientation)
+{
+        QVector4D pose=m_poses[id].value<QVector4D>();
+        pose.setX(x);
+        pose.setY(y);
+        pose.setW(orientation*M_PI/180.0);
+        m_poses[id]=pose;
+        emit posesChanged();
+
 }
 
 
