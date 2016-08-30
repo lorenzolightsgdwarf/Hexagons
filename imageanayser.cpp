@@ -238,7 +238,7 @@ QVector<QVector3D> ImageAnayser::approximations(QVector<QVector3D> exact, float 
         QVector2D best_alternative(DBL_MAX,DBL_MAX);
         Q_FOREACH(QVector2D valid_position,m_valid_positions){
             if(exact[0].toVector2D().distanceToPoint(valid_position)< exact[0].toVector2D().distanceToPoint(best_alternative))
-                best_alternative=exact[0].toVector2D();
+                best_alternative=valid_position;
         }
         x_new=best_alternative.x();
         y_new=best_alternative.y();
